@@ -1,0 +1,44 @@
+﻿@page "/results"
+@inject NavigationManager NavigationManager
+
+<div class="container mt-5">
+    <h1 class="display-4 mb-4">Conversion Results</h1>
+    <p class="lead">Below are the PNG images generated from your PDF file.</p>
+
+    @if (ImageUrls.Any())
+    {
+        <div class="row">
+            @foreach (var imageUrl in ImageUrls)
+            {
+                <div class="col-md-4 mb-3">
+                    <div class="card">
+                        <img src="@imageUrl" class="card-img-top" alt="Converted PNG" style="max-width: 100%; height: auto;" />
+                        <div class="card-body">
+                            <a href="@imageUrl" class="btn btn-outline-primary" download>Download PNG</a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-warning" role="alert">
+            No images were generated. Please try again.
+        </div>
+    }
+
+    <a href="/convert-pdf" class="btn btn-secondary mt-3">Back to Converter</a>
+</div>
+
+@code {
+    private List<string> ImageUrls { get; set; } = new();
+
+    protected override void OnInitialized()
+    {
+        // Get image URLs from query string
+        var uri = new Uri(NavigationManager.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        ImageUrls = query.GetValues("image")?.ToList() ?? new List<string>();
+    }
+}

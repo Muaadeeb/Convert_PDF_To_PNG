@@ -1,0 +1,81 @@
+﻿@page "/convert-pdf"
+@using PDF_To_PNG_Converter.Services
+
+@inject PdfConverterService PdfConverterService
+@inject NavigationManager NavigationManager
+@inject IWebHostEnvironment WebHostEnvironment
+
+<div class="container mt-5">
+    <h1 class="display-4 mb-4">Convert PDF to PNG</h1>
+    <p class="lead">Upload a PDF file (up to 3 pages) to convert each page into a high-quality PNG image.</p>
+
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            @ErrorMessage
+        </div>
+    }
+
+    <div class="card p-4">
+        <div class="mb-3">
+            <label for="pdfFile" class="form-label">Select PDF File</label>
+            <InputFile id="pdfFile" class="form-control" OnChange="@HandleFileSelected" accept=".pdf" />
+        </div>
+        <button class="btn btn-primary" disabled="@(IsProcessing || SelectedFile == null)" @onclick="ConvertPdfToPng">
+            @(IsProcessing ? "Converting..." : "Convert to PNG")
+        </button>
+    </div>
+</div>
+
+@code {
+    private IBrowserFile? SelectedFile { get; set; }
+    private string? ErrorMessage { get; set; }
+    private bool IsProcessing { get; set; }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        SelectedFile = e.File;
+        ErrorMessage = null;
+    }
+
+    private async Task ConvertPdfToPng()
+    {
+        if (SelectedFile == null)
+        {
+            ErrorMessage = "Please select a PDF file.";
+            return;
+        }
+
+        try
+        {
+            IsProcessing = true;
+
+            // Save the uploaded PDF to wwwroot
+            var pdfPath = Path.Combine(WebHostEnvironment.WebRootPath, "uploads", SelectedFile.Name);
+            Directory.CreateDirectory(Path.GetDirectoryName(pdfPath)!);
+            await using (var stream = SelectedFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024)) // 10MB limit
+            {
+                await using (var fileStream = new FileStream(pdfPath, FileMode.Create))
+                {
+                    await stream.CopyToAsync(fileStream);
+                }
+            }
+
+            // Convert PDF to PNG
+            var outputDir = Path.Combine(WebHostEnvironment.WebRootPath, "output");
+            var outputFiles = await PdfConverterService.ConvertPdfToPngAsync(pdfPath, outputDir);
+
+            // Navigate to results page with output file paths
+            var query = string.Join("&", outputFiles.Select(f => $"image={Uri.EscapeDataString(f)}"));
+            NavigationManager.NavigateTo($"/results?{query}");
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            IsProcessing = false;
+        }
+    }
+}
